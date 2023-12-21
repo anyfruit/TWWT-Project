@@ -1,0 +1,767 @@
+---
+title: "DualTasking"
+author: "Kejing Yan"
+date: "2023-10-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(writexl)
+library(car)
+library(ggplot2)
+library(dplyr)
+library(mclust)
+library(randomForest)
+library(gbm)
+library(xgboost)
+```
+
+1. Initial baseline walk
+2. walk w/ low obstacle
+3. walk w/ medium obstacle
+4. walk w/ high obstacle
+5. typing while walk
+6. texting while walk
+7. typing while walk w/ low obstacle
+8. texting while walk w/ low obstacle  
+9. typing while walk w/ medium obstacle
+10. texting while walk w/ medium obstacle  
+11. typing while walk w/ high obstacle
+12. texting while walk w/ high obstacle  
+13. final baseline walk
+
+```{r, include = FALSE}
+data <- data.frame(matrix(nrow = 468, ncol = 20))
+colnames(data) <- c('ID', 'Condition',	'Trial',	'Mean Step Length (cm.)',	'Mean Stride Length (cm.)',	'Stride Width (cm.)',	'Step Time (sec.)',	'Stride Time (sec.)',	'Total D. Support (sec.)',	'Velocity (cm./sec.)',	'Cadence (steps/min.)',	'%CV Step Length (cm.)',	'%CV Stride Length (cm.)',	'%CV Stride Width (cm.)',	'%CV Step Time (sec.)',	'%CV Stride Time (sec.)',	'%CV Total D. Support (sec.)', 'Gender', 'Obstacle', 'Task')
+```
+
+## Create excel file
+```{r, eval = FALSE, include = FALSE}
+count = 1
+
+  for (j in 1:13) {
+      for (k in 1:3) {
+        
+        zeros <- '00'
+        
+        filename = paste(zeros, 1, sep = '')
+        subname = paste('cond', j, '0', k, sep = '')
+        filename = paste('TWWT/', filename, '/', subname, '.xlsx', sep = '')
+        
+        fullname1 = paste("C:/Users/闫可菁/Dropbox/Research/Motor Development Lab/", filename, sep = '')
+        fullname2 = paste("C:/Users/闫可菁/Dropbox/Research/Motor Development Lab/", 'TWWT/', zeros, 1, '/', subname, '_info.xlsx', sep = '')
+        
+        if (file.exists(filename)) {
+          if (file.info(fullname1)$size < file.info(fullname2)$size) {
+            filename <- paste("TWWT/", zeros, 1, "/", subname, "_info.xlsx", sep = '')
+          }
+        }
+        
+        #print(filename)
+          
+        if (file.exists(filename)) {
+          inputdata <- read_excel(filename, range = "C12:AZ23", col_types = c("numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric"))
+            
+            data[count, 1] = 1
+            data[count, 2] = j
+            data[count, 3] = k
+            data[count, 4:11] = inputdata[4,c(16, 18:21, 35, 48, 50)]
+            data[count, 12:17] = inputdata[11, c(16, 18:21, 35)]
+            
+            inputdata2 <- read_excel(filename, range = 'B3', col_names = FALSE)
+            data[count,18] <- inputdata2
+          
+            
+        } else {
+            data[count, 1] = 1
+            data[count, 2] = j
+            data[count, 3] = k
+            data[count, 4:17] = NA
+            data[count, 18] = NA
+        }
+        
+        if (j %in% c(1,5,6,13)) data[count,19] <- 0
+        if (j %in% c(2,7,8)) data[count, 19] <- 1
+        if (j %in% c(3,9,10)) data[count, 19] <- 2
+        if (j %in% c(4,11,12)) data[count, 19] <- 3
+        
+        if (j %in% c(1,2,3,4,13)) data[count,20] <- 0
+        if (j %in% c(5,7,9,11)) data[count, 20] <- 1
+        if (j %in% c(6,8,10,12)) data[count, 20] <- 2
+        
+        count = count + 1
+      }
+  }
+
+
+
+for (i in 2:12) {
+  for (j in 1:13) {
+      for (k in 1:3) {
+        
+        if (i < 10) {
+          zeros <- '00'
+        } else {
+          zeros <- '0'
+        }
+        
+        filename = paste(zeros, i, sep = '')
+        subname = paste(j, '0', k, sep = '')
+        filename = paste('TWWT/', filename, '/', subname, '.xlsx', sep = '')
+        
+        fullname1 = paste("C:/Users/闫可菁/Dropbox/Research/Motor Development Lab/", filename, sep = '')
+        fullname2 = paste("C:/Users/闫可菁/Dropbox/Research/Motor Development Lab/", 'TWWT/', zeros, i, '/', subname, '_info.xlsx', sep = '')
+        
+        if (file.exists(filename)) {
+          if (file.exists(fullname2)) {
+            if (file.info(fullname1)$size < file.info(fullname2)$size) {
+              filename <- paste("TWWT/", zeros, i, "/", subname, "_info.xlsx", sep = '')
+            }
+          }
+        }
+        
+        #print(filename)
+          
+        if (file.exists(filename)) {
+          inputdata <- read_excel(filename, range = "C12:AZ23", col_types = c("numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric", "numeric", "numeric", 
+         "numeric"))
+            
+            data[count, 1] = i
+            data[count, 2] = j
+            data[count, 3] = k
+            data[count, 4:11] = inputdata[4,c(16, 18:21, 35, 48, 50)]
+            data[count, 12:17] = inputdata[11, c(16, 18:21, 35)]
+            inputdata2 <- read_excel(filename, range = 'B3', col_names = FALSE)
+            data[count,18] <- inputdata2
+            
+          
+        } else {
+            data[count, 1] = i
+            data[count, 2] = j
+            data[count, 3] = k
+            data[count, 4:17] = NA
+            data[count, 18] = NA
+        }
+        
+        if (j %in% c(1,5,6,13)) data[count,19] <- 0
+        if (j %in% c(2,7,8)) data[count, 19] <- 1
+        if (j %in% c(3,9,10)) data[count, 19] <- 2
+        if (j %in% c(4,11,12)) data[count, 19] <- 3
+        
+        if (j %in% c(1,2,3,4,13)) data[count,20] <- 0
+        if (j %in% c(5,7,9,11)) data[count, 20] <- 1
+        if (j %in% c(6,8,10,12)) data[count, 20] <- 2
+        
+        count = count + 1
+      }
+  }
+}
+```
+
+
+```{r, eval = FALSE, include = FALSE}
+write_xlsx(data,"TWWT_fulldata.xlsx")
+```
+
+
+```{r}
+data <- read_excel("TWWT_fulldata.xlsx")
+```
+
+
+## Create dataframe of averaged data
+```{r}
+data_avg <- data.frame(matrix(nrow = 156, ncol = 23))
+
+for (i in seq(1, 468, by = 3)) {
+  j = (i+2)/3
+  data_avg[j,1:2] = data[i,1:2]
+  for (k in c(4:17, 21:23)) {
+    num1 = as.numeric(data[i, k])
+    num2 = as.numeric(data[i+1, k])
+    num3 = as.numeric(data[i+2, k])
+    if (is.na(num1) && is.na(num2) && is.na(num3)) {
+      data_avg[j,k] = NA
+    } else {
+      count = 3
+      if (is.na(num1)){
+        num1 = 0
+        count = count - 1
+      }
+      num2 = as.numeric(data[i+1, k])
+      if (is.na(num2)){
+        num2 = 0
+        count = count - 1
+      }
+      num3 = as.numeric(data[i+2, k])
+      if (is.na(num3)){
+        num3 = 0
+        count = count - 1
+      }
+      data_avg[j, k] = (num1+ num2+ num3)/count
+    }
+  }
+  for (k in 18:20) {
+    if (is.na(data[i,k]) != TRUE) {
+        data_avg[j, k] <- data[i, k]
+    } else if (is.na(data[i+1,k]) != TRUE){
+      data_avg[j, k] <- data[i+1, k]
+    } else {
+      data_avg[j, k] <- data[i+2, k]
+    }
+
+  }
+}
+
+data_avg = data_avg[,-3]
+colnames(data_avg) = colnames(data)[-3]
+
+```
+
+
+## Kmeans Clustering
+```{r}
+#copy data into a new dataframe with 17 independent variables
+cluster.data <- data_avg[,-c(1,2,18,19,22)]
+cluster.data$Gender <- ifelse(data_avg$Gender == "female", 1, 0)
+cluster.data[,1:14] <- scale(cluster.data[,c(1:14,16:17)])
+cluster.data <- na.omit(cluster.data)
+
+#cluster with 4 centers (conjecturing that four groups will correspond to four different obstacle height)
+cl <- kmeans(cluster.data, centers = 4)
+
+#copy cluster result into dataframe
+plot_data <- na.omit(data_avg[,-c(22)])
+plot_data$Cluster <- as.factor(cl$cluster)
+
+plot_data$Obstacle <- as.factor(plot_data$Obstacle)
+plot_data$Task <- as.factor(plot_data$Task)
+
+```
+### Cluster with 4 centers
+```{r}
+# Perform PCA
+pca_result <- prcomp(cluster.data, rank. = 2)  # reduce to 2 dimensions for visualization
+
+loadings <- pca_result$rotation
+
+# Add PCA results to the original data frame
+plot_data$PC1 <- pca_result$x[, 1]
+plot_data$PC2 <- pca_result$x[, 2]
+
+# Use ggplot2 to create the PCA scatter plot colored by clusters
+ggplot(plot_data, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +
+  geom_point() +
+  scale_color_manual(values = c("purple", 'steelblue', 'green', 'orange','pink','grey','black','darkblue','darkgreen','yellow','blue','red')) + # Customize colors if needed
+  theme_minimal() +
+  labs(title = "PCA of k-Means Clusters (4 Centers)", color = "Cluster")
+
+```
+
+```{r}
+#copy data into a new dataframe with 17 independent variables
+cluster.data <- data_avg[,-c(1,2,18,19,22)]
+cluster.data$Gender <- ifelse(data_avg$Gender == "female", 1, 0)
+cluster.data[,1:14] <- scale(cluster.data[,c(1:14,16:17)])
+cluster.data <- na.omit(cluster.data)
+
+#cluster with 3 centers (conjecturing that four groups will correspond to three different task)
+cl <- kmeans(cluster.data, centers = 3)
+
+#copy cluster result into dataframe
+plot_data <- na.omit(data_avg[,-c(22)])
+plot_data$Cluster <- as.factor(cl$cluster)
+
+plot_data$Obstacle <- as.factor(plot_data$Obstacle)
+plot_data$Task <- as.factor(plot_data$Task)
+
+```
+
+### Cluster with 3 centers
+```{r}
+# Perform PCA
+pca_result <- prcomp(cluster.data, rank. = 2)  # reduce to 2 dimensions for visualization
+
+loadings <- pca_result$rotation
+
+# Add PCA results to the original data frame
+plot_data$PC1 <- pca_result$x[, 1]
+plot_data$PC2 <- pca_result$x[, 2]
+
+# Use ggplot2 to create the PCA scatter plot colored by clusters
+ggplot(plot_data, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +
+  geom_point() +
+  scale_color_manual(values = c("purple", 'steelblue', 'green', 'orange','pink','grey','black','darkblue','darkgreen','yellow','blue','red')) + # Customize colors if needed
+  theme_minimal() +
+  labs(title = "PCA of k-Means Clusters (3 Centers)", color = "Cluster")
+
+```
+
+
+### Cluster with 12 centers
+```{r}
+#copy data into a new dataframe with 17 independent variables
+cluster.data <- data_avg[,-c(1,2,18,19,22)]
+cluster.data$Gender <- ifelse(data_avg$Gender == "female", 1, 0)
+cluster.data[,1:14] <- scale(cluster.data[,c(1:14,16:17)])
+cluster.data <- na.omit(cluster.data)
+
+#cluster with 12 centers (conjecturing that four groups will correspond to all 12 different conditions)
+cl <- kmeans(cluster.data, centers = 12)
+
+#copy cluster result into dataframe
+plot_data <- na.omit(data_avg[,-c(22)])
+plot_data$Cluster <- as.factor(cl$cluster)
+
+plot_data$Obstacle <- as.factor(plot_data$Obstacle)
+plot_data$Task <- as.factor(plot_data$Task)
+
+```
+
+```{r}
+# Perform PCA
+pca_result <- prcomp(cluster.data, rank. = 2)  # reduce to 2 dimensions for visualization
+
+loadings <- pca_result$rotation
+
+# Add PCA results to the original data frame
+plot_data$PC1 <- pca_result$x[, 1]
+plot_data$PC2 <- pca_result$x[, 2]
+
+# Use ggplot2 to create the PCA scatter plot colored by clusters
+ggplot(plot_data, aes(x = PC1, y = PC2, color = as.factor(Cluster))) +
+  geom_point() +
+  scale_color_manual(values = c("purple", 'steelblue', 'green', 'orange','pink','grey','black','darkblue','darkgreen','yellow','blue','red')) + # Customize colors if needed
+  theme_minimal() +
+  labs(title = "PCA of k-Means Clusters (12 Centers)", color = "Cluster")
+
+```
+
+## Gaussian Mixture (GMM)
+```{r}
+#copy data into a new dataframe with 17 independent variables
+cluster.data <- data_avg[,-c(1,2,18,19,22)]
+cluster.data$Gender <- ifelse(data_avg$Gender == "female", 1, 0)
+cluster.data[,1:14] <- scale(cluster.data[,c(1:14,16:17)])
+cluster.data <- na.omit(cluster.data)
+
+gmm.result <- Mclust(cluster.data)
+summary(gmm.result)
+
+```
+
+```{r}
+pca_result <- prcomp(cluster.data, rank. = 2)
+
+plot_data <- na.omit(data_avg[,-c(22)])
+plot_data$Cluster <- as.factor(gmm.result$classification)
+
+plot_data$Obstacle <- as.factor(plot_data$Obstacle)
+plot_data$Task <- as.factor(plot_data$Task)
+
+plot_data$PC1 <- pca_result$x[, 1]
+plot_data$PC2 <- pca_result$x[, 2]
+
+ggplot(plot_data, aes(x = PC1, y = PC2, color = factor(Cluster), shape = factor(Condition))) +
+    geom_point() +
+    theme_minimal() +
+    labs(color = "Cluster", shape = "Condition")
+
+```
+
+
+## Random Forest
+```{r}
+cluster.data <- data_avg[,-c(1,18,19,22)]
+cluster.data$Gender <- ifelse(data_avg$Gender == "female", 1, 0)
+cluster.data[,c(2:15,17:18)] <- scale(cluster.data[,c(2:15,17:18)])
+cluster.data <- na.omit(cluster.data)
+names(cluster.data) <- make.names(names(cluster.data))
+rf_model <- randomForest(Condition ~ ., data = cluster.data)
+print(rf_model)
+predictions <- predict(rf_model, newdata=cluster.data)
+predictions
+
+```
+```{r}
+# Predicting on the same dataset used for training just as an example
+predictions <- predict(rf_model, cluster.data)
+
+predictions_rounded <- round(predictions)
+
+# Assuming that Condition is a numeric column that represents integer classes
+actual_values <- cluster.data$Condition
+accuracy <- sum(predictions_rounded == actual_values) / length(actual_values)
+
+# Calculate RMSE
+rmse <- sqrt(mean((predictions - actual_values)^2))
+
+accuracy
+```
+
+## GBM
+```{r}
+cluster.data <- data_avg[,-c(1,18,19,22)]
+cluster.data$Gender <- ifelse(data_avg$Gender == "female", 1, 0)
+cluster.data[,c(2:15,17:18)] <- scale(cluster.data[,c(2:15,17:18)])
+cluster.data <- na.omit(cluster.data)
+names(cluster.data) <- make.names(names(cluster.data))
+
+gbm_model <- gbm(Condition ~ ., data=cluster.data, distribution="gaussian", n.trees=100, interaction.depth=3)
+
+summary(gbm_model)
+
+gbm_predictions <- predict(gbm_model, newdata=cluster.data, n.trees=100)
+
+
+# Predicting on the same dataset used for training as an example
+predicted_classes <- predict(gbm_model, newdata = cluster.data, n.trees = gbm_model$n.trees, type = "response")
+
+
+predictions_rounded <- round(predicted_classes)
+
+actual_classes <- cluster.data$Condition  # Make sure this is the correct column for actual class labels
+accuracy <- mean(predictions_rounded == actual_classes)
+
+# Predict using the GBM model
+predictions <- predict(gbm_model, newdata = cluster.data, n.trees = gbm_model$n.trees)
+
+# Round predictions to nearest integer
+predictions_rounded <- round(predictions)
+
+# Assuming that Condition is a numeric column that represents integer classes
+actual_values <- cluster.data$Condition
+
+# Calculate accuracy
+accuracy <- sum(predictions_rounded == actual_values) / length(actual_values)
+
+accuracy
+```
+
+## XGBoost
+
+```{r}
+# Ensure that 'Condition' is a factor and get its levels as numeric values
+num_classes = length(unique(cluster.data$Condition))
+cluster.data$Condition <- as.numeric(as.factor(cluster.data$Condition)) - 1
+
+# Check the range of 'Condition' to make sure it's within [0, num_class)
+if(min(cluster.data$Condition) < 0 || max(cluster.data$Condition) >= num_classes) {
+  stop("Labels are not within the correct range.")
+}
+
+# Update the DMatrix
+data_matrix <- xgb.DMatrix(data = as.matrix(cluster.data[, -which(names(cluster.data) == "Condition")]),
+                           label = cluster.data$Condition)
+
+# Update the parameters (make sure num_class is set correctly)
+params <- list(
+  objective = "multi:softprob",
+  eval_metric = "mlogloss",
+  max_depth = 6,
+  eta = 0.3,
+  num_class = num_classes,  # This should be the number of unique classes
+  nthread = 2
+)
+
+# Train the model
+xgb_model <- xgb.train(params = params,
+                       data = data_matrix,
+                       nrounds = 100,
+                       watchlist = list(train = data_matrix),
+                       verbose = 0)
+
+# Make predictions
+pred_probs <- predict(xgb_model, data_matrix)
+num_data <- nrow(cluster.data)
+
+# Reshape the prediction probabilities and find the class with the maximum probability
+pred_classes <- matrix(pred_probs, nrow = num_data, byrow = TRUE)
+predicted_labels <- max.col(pred_classes) - 1  # Subtract 1 because max.col is 1-indexed
+
+# Actual labels (make sure these are zero-indexed as well)
+actual_labels <- cluster.data$Condition
+
+# Compute accuracy
+accuracy <- mean(predicted_labels == actual_labels)
+ 
+accuracy
+```
+This is the accuracy with full dataset's condition compared with predicted condition
+
+```{r}
+# Example of simple train-test split
+set.seed(123)  # for reproducibility
+train_indices <- sample(1:nrow(cluster.data), 0.8 * nrow(cluster.data))
+test_indices <- setdiff(1:nrow(cluster.data), train_indices)
+
+train_data <- cluster.data[train_indices, ]
+test_data <- cluster.data[test_indices, ]
+
+train_matrix <- xgb.DMatrix(data = as.matrix(train_data[, -which(names(train_data) == "Condition")]),
+                            label = train_data$Condition)
+test_matrix <- xgb.DMatrix(data = as.matrix(test_data[, -which(names(test_data) == "Condition")]),
+                           label = test_data$Condition)
+
+# Train and evaluate the model using the train and test datasets
+# Make predictions on the test set
+test_predictions_probs <- predict(xgb_model, test_matrix)
+num_test_data <- nrow(test_data)
+
+# Convert probabilities to class predictions
+test_pred_classes <- matrix(test_predictions_probs, nrow = num_test_data, byrow = TRUE)
+test_predicted_labels <- max.col(test_pred_classes) - 1
+
+# Actual test labels
+test_actual_labels <- test_data$Condition
+
+# Calculate accuracy
+test_accuracy <- mean(test_predicted_labels == test_actual_labels)
+
+# Print the accuracy
+test_accuracy
+
+```
+This is the test accuracy that I split dataset into train and test. After using the training dataset to build the model, I used the testing dataset to test the model, and the accuracy is still 1.
+
+```{r}
+importance_matrix <- xgb.importance(feature_names = colnames(cluster.data[, -which(names(cluster.data) == "Condition")]), model = xgb_model)
+print(importance_matrix)
+```
+CV Step Time, CV Stride Time are the features contributed the most to XGBoost's performance. 
+
+<!---
+
+## Visualization
+```{r, include = FALSE}
+#Step Length
+boxplot(data_avg$`%CV Step Length (cm.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "%CV Step Length (cm.)")
+boxplot(data_avg$`Mean Step Length (cm.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Mean Step Length (cm.)")
+
+#Velocity
+boxplot(data_avg$`Velocity (cm./sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Velocity")
+
+#Cadence
+boxplot(data_avg$`Cadence (steps/min.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Cadence (steps/min.)")
+
+#Step Time
+boxplot(data_avg$`Step Time (sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Mean Step Time (sec.)")
+boxplot(data_avg$`%CV Step Time (sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "%CV Step Time (sec.)")
+
+#Total D. Support
+boxplot(data_avg$`%CV Total D. Support (sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "%CV Total D. Support (sec.)")
+boxplot(data_avg$`Total D. Support (sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Mean Total D. Support (sec.)")
+
+
+#Stride Length
+boxplot(data_avg$`%CV Stride Length (cm.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "%CV Stride Length (cm.)")
+boxplot(data_avg$`Mean Stride Length (cm.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Mean Stride Length (cm.)")
+
+#Stride Width
+boxplot(data_avg$`%CV Stride Width (cm.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "%CV Stride Width (cm.)")
+boxplot(data_avg$`Stride Width (cm.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Mean Stride Width (cm.)")
+
+#Stride Time
+boxplot(data_avg$`Stride Time (sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "Mean Stride Time (sec.)")
+boxplot(data_avg$`%CV Stride Time (sec.)`~data_avg$Condition, 
+        xlab = "Condition", ylab = "%CV Stride Time (sec.)")
+
+```
+
+
+## Condition 1, 5, 6
+```{r, include = FALSE}
+data_156 <- data_avg[data_avg$Condition %in% c('1', '5', '6'),]
+
+create_boxplot <- function(data, variable, title) {
+  ggplot(data, aes(x = as.factor(Condition), y = .data[[variable]])) +
+    geom_boxplot() +
+    stat_summary(fun = mean, geom = "line", aes(group = 1), 
+                 linetype = "dashed", color = "red", linewidth = 0.5) +
+    labs(title = title, x = "Condition", y = title) +
+    theme_minimal()
+}
+
+# List of variable names as they appear in your dataframe
+variables <- list(
+  `%CV Step Length (cm.)` = "%CV Step Length (cm.)",
+  `Mean Step Length (cm.)` = "Mean Step Length (cm.)",
+  `Velocity (cm./sec.)` = "Velocity (cm./sec.)",
+  `Cadence (steps/min.)` = "Cadence (steps/min.)",
+  `Step Time (sec.)` = "Step Time (sec.)",
+  `%CV Step Time (sec.)` = "%CV Step Time (sec.)",
+  `%CV Total D. Support (sec.)` = "%CV Total D. Support (sec.)",
+  `Total D. Support (sec.)` = "Total D. Support (sec.)",
+  `%CV Stride Length (cm.)` = "%CV Stride Length (cm.)",
+  `Mean Stride Length (cm.)` = "Mean Stride Length (cm.)",
+  `%CV Stride Width (cm.)` = "%CV Stride Width (cm.)",
+  `Stride Width (cm.)` = "Stride Width (cm.)",
+  `Stride Time (sec.)` = "Stride Time (sec.)",
+  `%CV Stride Time (sec.)` = "%CV Stride Time (sec.)"
+)
+
+# Create and save plots for each variable
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_156, var_name, var_label)
+  print(plot)
+}
+```
+
+## Condition 2, 7, 8
+```{r, include = FALSE}
+data_278 <- data_avg[data_avg$Condition %in% c('2', '7', '8'),]
+
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_278, var_name, var_label)
+  print(plot)
+}
+
+```
+
+
+## Condition 3, 9, 10
+```{r, include = FALSE}
+data_3910 <- data_avg[data_avg$Condition %in% c('3', '9', '10'),]
+
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_3910, var_name, var_label)
+  print(plot)
+}
+```
+
+## Condition 4, 11, 12
+```{r, include = FALSE}
+data_41112 <- data_avg[data_avg$Condition %in% c('4', '11', '12'),]
+
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_41112, var_name, var_label)
+  print(plot)
+}
+```
+
+## Condition 1, 2, 3, 4
+```{r, include = FALSE}
+data_1234 <- data_avg[data_avg$Condition %in% c('1', '2', '3','4'),]
+
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_1234, var_name, var_label)
+  print(plot)
+}
+
+```
+
+## Condition 5, 7, 9, 11
+```{r, include = FALSE}
+data_57911 <- data_avg[data_avg$Condition %in% c('5', '7', '9','11'),]
+
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_57911, var_name, var_label)
+  print(plot)
+}
+
+```
+
+
+## Condition 6, 8, 10, 12
+```{r, include = FALSE}
+data_681012 <- data_avg[data_avg$Condition %in% c('6', '8', '10','12'),]
+
+for (var_name in names(variables)) {
+  var_label <- variables[[var_name]]
+  plot <- create_boxplot(data_681012, var_name, var_label)
+  print(plot)
+}
+
+```
+
+
+## Regression
+```{r, include = FALSE}
+subset = data_avg[,-1]
+full.model <- lm(subset$Condition ~., data = subset)
+summary(full.model)
+```
+### BIC Variable Selection
+```{r, include = FALSE}
+#step(full.model, direction = "both", k = log(length(subset)))
+```
+Result shown that Cadence and CV Stride Time contribute more to predict Condition, so that we might can infer Condition might cause greater influence two these two factors.
+```{r, include = FALSE}
+aic.both.model <- lm(formula = subset$Condition ~ `%CV Stride Time (sec.)` + 
+                       `Cadence (steps/min.)`, data = subset)
+summary(aic.both.model)
+```
+
+
+```{r, include = FALSE}
+#Split into two parts to see scatter plots
+
+scatterplotMatrix(~ data_avg$Condition + data_avg$`Mean Step Length (cm.)` + data_avg$`Mean Stride Length (cm.)` + data_avg$`Stride Width (cm.)` + data_avg$`Step Time (sec.)` + data_avg$`Stride Time (sec.)` + data_avg$`Total D. Support (sec.)` + data_avg$`Velocity (cm./sec.)`)
+
+scatterplotMatrix(~ data_avg$Condition + data_avg$`Cadence (steps/min.)` + data_avg$`%CV Step Length (cm.)` + data_avg$`%CV Stride Length (cm.)` + data_avg$`%CV Stride Width (cm.)` + data_avg$`%CV Step Time (sec.)` + data_avg$`%CV Stride Time (sec.)` + data_avg$`%CV Total D. Support (sec.)`)
+```
+
+CV Step Time, CV Stride Time, Velocity, Mean Step Time, Cadence have comparatively stronger relationship with Condition
+
+-->
+
+
+
+
+
+
+
